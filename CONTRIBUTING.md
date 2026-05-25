@@ -6,78 +6,73 @@ you spend your time.
 
 ## branch model
 
+Trunk-based. One long-lived branch (`main`), short-lived topic branches
+per PR. No `develop` / `release` ceremony.
+
 ```
-   feature/foo, fix/bar, chore/baz
+   feature/foo, fix/bar, chore/baz   (short-lived, one per PR)
                   │
-                  ▼  (PR)
-              develop ────────────── ongoing integration
-                  │
-                  ▼  (PR, when ready to release)
-                main ────────────── stable, release-plz lives here
+                  ▼  (PR, squash or rebase)
+                main ────────────── stable; release-plz observes
                   │
                   ▼
-              v0.1.x tag → GitHub Release → AUR
+              v0.x.y tag → GitHub Release → AUR
 ```
 
-| branch | rules |
-| :----- | :---- |
-| `main` | stable. **Direct push prohibited.** Only release-plz auto-PRs land here. Each merge bumps a tag and triggers the release pipeline. |
-| `develop` | integration. **Default target for contributions.** All feature/fix PRs merge here. |
-| `feature/<topic>`, `fix/<topic>`, `chore/<topic>` | short-lived. Open from `develop`, merge back into `develop`. Auto-deleted on merge. |
-
-Releases happen by opening a PR `develop -> main`. release-plz then opens
-its bump PR on `main`, you merge it, the rest is automatic.
+| branch                                       | rules                                                              |
+| :------------------------------------------- | :----------------------------------------------------------------- |
+| `main`                                       | stable. Direct push prohibited. Only PR merges allowed.            |
+| `feature/<topic>`, `fix/<topic>`, `chore/...`| short-lived. Open from `main`, merge back into `main`, auto-deleted. |
+| `release-plz-<timestamp>`                    | bot-owned. Holds the version bump PR. Auto-deleted on merge.       |
 
 ## quick triage
 
-| if you want to...                          | do this                                                                                          |
-| :----------------------------------------- | :----------------------------------------------------------------------------------------------- |
-| report a bug                               | open an issue using the bug template                                                             |
-| propose a feature                          | open an issue using the feature template, **before** writing code                                |
-| report a security issue                    | follow [SECURITY.md](SECURITY.md), do not open a public issue                                    |
-| fix a typo / clean a small thing           | open a PR directly **against `develop`**                                                         |
-| change behaviour, add a feature, refactor  | open an issue first to align on the approach, then PR against `develop`                          |
+| if you want to...                          | do this                                                        |
+| :----------------------------------------- | :------------------------------------------------------------- |
+| report a bug                               | open an issue using the bug template                           |
+| propose a feature                          | open an issue using the feature template **before** writing code |
+| report a security issue                    | follow [SECURITY.md](SECURITY.md), do not open a public issue  |
+| fix a typo / clean a small thing           | open a PR directly against `main`                              |
+| change behaviour, add a feature, refactor  | open an issue first to align, then PR against `main`           |
 
 ## local setup
 
 ```sh
 git clone https://github.com/intjiraya/constellation
 cd constellation
-git checkout develop                            # work off develop
-git switch -c fix/short-description             # short-lived branch
+git switch -c fix/short-description           # short-lived topic branch
 
-cargo test                                      # 56 unit + 15 integration tests
+cargo test                                    # 56 unit + 15 integration tests
 cargo clippy --all-targets -- -D warnings
 cargo run -- --no-open
 ```
 
-Toolchain is pinned in `rust-toolchain.toml` (stable). MSRV is `1.85`,
-declared in `Cargo.toml`. The CI matrix verifies MSRV builds on every PR.
+Toolchain pinned in `rust-toolchain.toml` (stable). MSRV is `1.85`, declared
+in `Cargo.toml`. The CI matrix verifies MSRV builds on every PR.
 
 ## conventional commits
 
 Commits and PR titles use [Conventional Commits](https://www.conventionalcommits.org).
 `release-plz` reads them to bump versions and assemble `CHANGELOG.md`.
 
-| prefix      | when to use                                  | release-plz |
-| :---------- | :------------------------------------------- | :---------- |
-| `feat:`     | a new user-facing capability                 | minor bump  |
-| `fix:`      | a bug fix                                    | patch bump  |
-| `perf:`     | a performance improvement, no behaviour change | patch bump |
-| `refactor:` | a code change with no behaviour change       | patch bump  |
+| prefix      | when to use                                  | release-plz        |
+| :---------- | :------------------------------------------- | :----------------- |
+| `feat:`     | a new user-facing capability                 | minor bump         |
+| `fix:`      | a bug fix                                    | patch bump         |
+| `perf:`     | a performance improvement, no behaviour      | patch bump         |
+| `refactor:` | a code change with no behaviour change       | patch bump         |
 | `docs:`     | docs-only change                             | shown in changelog |
-| `chore:`    | non-code change (deps, repo hygiene)         | skipped     |
-| `ci:`       | CI/CD only                                   | skipped     |
-| `test:`     | test-only changes                            | skipped     |
-| `build:`    | build system changes                         | shown       |
+| `chore:`    | non-code change (deps, repo hygiene)         | skipped            |
+| `ci:`       | CI/CD only                                   | skipped            |
+| `test:`     | test-only changes                            | skipped            |
+| `build:`    | build system changes                         | shown              |
 
 Breaking changes: append `!` (e.g. `feat!: drop --legacy-flag`) and add a
 `BREAKING CHANGE:` footer in the body. release-plz then bumps the major.
 
 ## what every PR must pass
 
-`ci.yml` runs on every push and PR (against both `main` and `develop`).
-A PR cannot merge until:
+`ci.yml` runs on every push and PR. A PR cannot merge until:
 
 - `cargo fmt --all --check` is clean
 - `cargo clippy --all-targets --all-features -- -D warnings` is clean
@@ -102,16 +97,15 @@ load `cchats` locally and manually verify the affected flow.
 
 ## release flow (maintainer cheat-sheet)
 
-1. Work accumulates on `develop` via PRs.
-2. When ready, open a PR `develop -> main`. Title:
-   `chore: promote develop`. Squash-merge the PR (one stable commit on main).
-3. release-plz observes the new main commit, opens a `chore: release v0.x.y` PR.
-4. Merge that PR. release-plz tags the commit.
-5. `release.yml` cross-compiles bin's for 5 targets, publishes the GitHub Release.
-6. `aur.yml` listens to the release event, pushes a refreshed `constellation-bin`
-   to AUR (sha256 recomputed from the release tarballs).
+1. PRs land in `main`.
+2. release-plz observes new conventional commits, opens
+   `chore: release v0.x.y` PR with version bump + CHANGELOG entry.
+3. Merge the release PR. release-plz creates the tag through `RELEASE_PLZ_TOKEN`.
+4. `release.yml` cross-compiles binaries for 5 targets, publishes the GitHub Release.
+5. `aur.yml` listens to the release event, pushes a refreshed
+   `constellation-bin` to AUR (sha256 recomputed from the release tarballs).
 
-You touch nothing manually after step 2.
+You touch nothing manually.
 
 ## review
 

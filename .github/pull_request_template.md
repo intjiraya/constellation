@@ -1,11 +1,5 @@
 <!--
-Thanks for the PR!
-
-Target branch:
-  - `develop`  for feature / fix / chore PRs (default for contributors)
-  - `main`     only for `develop -> main` release promotions
-
-If you targeted the wrong branch, change it in the PR settings before review.
+Thanks for the PR! Target branch is `main`.
 -->
 
 ## what & why
@@ -14,7 +8,6 @@ If you targeted the wrong branch, change it in the PR settings before review.
 
 ## checklist
 
-- [ ] PR targets `develop` (or, if releasing, `main`)
 - [ ] commit title follows Conventional Commits (`feat:`, `fix:`, `chore:`...)
 - [ ] `cargo fmt --all --check` is clean
 - [ ] `cargo clippy --all-targets --all-features -- -D warnings` is clean

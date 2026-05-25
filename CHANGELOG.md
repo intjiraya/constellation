@@ -7,26 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.1.3] - 2026-05-25
-
-No user-facing changes. Release / CI pipeline maintenance only.
-
-## [0.1.2] - 2026-05-25
-
-No user-facing changes. Release / CI pipeline maintenance only.
-
-## [0.1.1] - 2026-05-25
-
-### Documentation
-
-- Redesign README, fix table alignment, trim, tweak ASCII art.
-
-### Fixed
-
-- Windows path separator handling in `display_path`.
-- Add Contributor Covenant 3.0 Code of Conduct.
-- Apply `cargo fmt` repo-wide.
-
 ## [0.1.0] - 2026-05-25
 
 ### Added
