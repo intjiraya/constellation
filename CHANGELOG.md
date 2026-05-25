@@ -52,9 +52,3 @@ No user-facing changes. Release / CI pipeline maintenance only.
   the binary.
 - DOMPurify mandatory, with a text-only fallback if it fails to load.
 - Spawned cwd must canonicalise under `$HOME`.
-
-[Unreleased]: https://github.com/intjiraya/constellation/compare/v0.1.3...HEAD
-[0.1.3]: https://github.com/intjiraya/constellation/releases/tag/v0.1.3
-[0.1.2]: https://github.com/intjiraya/constellation/releases/tag/v0.1.2
-[0.1.1]: https://github.com/intjiraya/constellation/releases/tag/v0.1.1
-[0.1.0]: https://github.com/intjiraya/constellation/releases/tag/v0.1.0
