@@ -22,6 +22,32 @@ fn seed(project_dir: &Path, fixture: &str, session_name: &str) {
     .unwrap();
 }
 
+fn seed_inline(project_dir: &Path, session_id: &str, content_term: &str) {
+    std::fs::create_dir_all(project_dir).unwrap();
+    let escaped = content_term.replace('"', "\\\"");
+    let content = format!(
+        "{{\"type\":\"ai-title\",\"aiTitle\":\"test\",\"sessionId\":\"{session_id}\"}}\n\
+{{\"type\":\"user\",\"message\":{{\"role\":\"user\",\"content\":\"{escaped}\"}},\
+\"uuid\":\"u-1\",\"timestamp\":\"2026-05-25T11:00:00.000Z\",\"sessionId\":\"{session_id}\",\"cwd\":\"/srv/x\"}}\n"
+    );
+    std::fs::write(project_dir.join(format!("{session_id}.jsonl")), content).unwrap();
+}
+
+fn ready_router_with_n_matches(n: usize, term: &str) -> (axum::Router, TempDir) {
+    let tmp = TempDir::new().unwrap();
+    for i in 0..n {
+        seed_inline(
+            &tmp.path().join(format!("-proj-{i}")),
+            &format!("sess-{i:03}"),
+            term,
+        );
+    }
+    let index = Index::new(tmp.path().to_owned());
+    index.rebuild();
+    let state = AppState::new(index);
+    (build_router(state), tmp)
+}
+
 fn ready_router() -> (axum::Router, TempDir) {
     let tmp = TempDir::new().unwrap();
     seed(
@@ -55,6 +81,7 @@ fn req_get(path: &str) -> Request<Body> {
     Request::builder()
         .method(Method::GET)
         .uri(path)
+        .header(header::HOST, "127.0.0.1:6767")
         .body(Body::empty())
         .unwrap()
 }
@@ -63,6 +90,26 @@ fn req_post(path: &str) -> Request<Body> {
     Request::builder()
         .method(Method::POST)
         .uri(path)
+        .header(header::HOST, "127.0.0.1:6767")
+        .body(Body::empty())
+        .unwrap()
+}
+
+fn req_get_with_host(path: &str, host: &str) -> Request<Body> {
+    Request::builder()
+        .method(Method::GET)
+        .uri(path)
+        .header(header::HOST, host)
+        .body(Body::empty())
+        .unwrap()
+}
+
+fn req_get_with_origin(path: &str, origin: &str) -> Request<Body> {
+    Request::builder()
+        .method(Method::GET)
+        .uri(path)
+        .header(header::HOST, "127.0.0.1:6767")
+        .header(header::ORIGIN, origin)
         .body(Body::empty())
         .unwrap()
 }
@@ -87,6 +134,139 @@ async fn get_stats_returns_populated_index_shape() {
 
     assert_eq!(v["total_usage"]["input"], 15);
     assert_eq!(v["total_usage"]["output"], 300);
+}
+
+#[tokio::test]
+async fn api_search_rejects_non_loopback_host() {
+    let (app, _tmp) = ready_router();
+    let resp = app
+        .oneshot(req_get_with_host(
+            "/api/search?q=readme",
+            "evil.example.com",
+        ))
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::FORBIDDEN);
+}
+
+#[tokio::test]
+async fn api_stats_rejects_non_loopback_host() {
+    let (app, _tmp) = ready_router();
+    let resp = app
+        .oneshot(req_get_with_host("/api/stats", "attacker.example.com"))
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::FORBIDDEN);
+}
+
+#[tokio::test]
+async fn api_rejects_external_origin_even_when_host_is_loopback() {
+    let (app, _tmp) = ready_router();
+    let resp = app
+        .oneshot(req_get_with_origin(
+            "/api/stats",
+            "https://evil.example.com",
+        ))
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::FORBIDDEN);
+}
+
+#[tokio::test]
+async fn api_accepts_loopback_host_with_no_origin() {
+    let (app, _tmp) = ready_router();
+    let resp = app.oneshot(req_get("/api/stats")).await.unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+}
+
+#[tokio::test]
+async fn api_accepts_loopback_host_with_loopback_origin() {
+    let (app, _tmp) = ready_router();
+    let resp = app
+        .oneshot(req_get_with_origin("/api/stats", "http://127.0.0.1:6767"))
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+}
+
+#[tokio::test]
+async fn get_search_finds_term_inside_session_body() {
+    let (app, _tmp) = ready_router();
+    let resp = app.oneshot(req_get("/api/search?q=readme")).await.unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let v = body_to_json(resp.into_body()).await;
+    let arr = v.as_array().expect("search returns array");
+    assert!(!arr.is_empty(), "expected at least one hit");
+    assert_eq!(arr[0]["session_id"], "tools-uuid");
+    let snippets = arr[0]["snippets"].as_array().expect("snippets array");
+    assert!(!snippets.is_empty());
+    let first = &snippets[0];
+    assert!(first["text"].as_str().is_some());
+    assert!(first["matches"].as_array().is_some());
+}
+
+#[tokio::test]
+async fn get_search_empty_query_returns_empty() {
+    let (app, _tmp) = ready_router();
+    let resp = app.oneshot(req_get("/api/search?q=")).await.unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let v = body_to_json(resp.into_body()).await;
+    assert_eq!(v.as_array().unwrap().len(), 0);
+}
+
+#[tokio::test]
+async fn get_search_clamps_limit_max_actually_caps_results() {
+    let (app, _tmp) = ready_router_with_n_matches(5, "alpha");
+    let resp = app
+        .oneshot(req_get("/api/search?q=alpha&limit=2"))
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let v = body_to_json(resp.into_body()).await;
+    let arr = v.as_array().unwrap();
+    assert_eq!(
+        arr.len(),
+        2,
+        "limit=2 should cap at 2 hits despite 5 matching sessions",
+    );
+}
+
+#[tokio::test]
+async fn get_search_clamps_limit_zero_to_min() {
+    let (app, _tmp) = ready_router_with_n_matches(3, "alpha");
+    let resp = app
+        .oneshot(req_get("/api/search?q=alpha&limit=0"))
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let v = body_to_json(resp.into_body()).await;
+    let arr = v.as_array().unwrap();
+    assert_eq!(arr.len(), 1, "limit=0 should clamp up to MIN=1");
+}
+
+#[tokio::test]
+async fn get_search_quoted_phrase_is_anded_by_server_tokenize() {
+    let (app, _tmp) = ready_router_with_n_matches(1, "Authentication module");
+    let resp = app
+        .oneshot(req_get("/api/search?q=%22Authentication+module%22"))
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let v = body_to_json(resp.into_body()).await;
+    let arr = v.as_array().unwrap();
+    assert!(
+        !arr.is_empty(),
+        "server should tokenize the quoted phrase into AND'd terms and find the session",
+    );
+}
+
+#[tokio::test]
+async fn get_search_no_q_param_returns_empty_array() {
+    let (app, _tmp) = ready_router();
+    let resp = app.oneshot(req_get("/api/search")).await.unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let v = body_to_json(resp.into_body()).await;
+    assert_eq!(v.as_array().unwrap().len(), 0);
 }
 
 #[tokio::test]

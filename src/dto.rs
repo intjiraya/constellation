@@ -10,6 +10,7 @@ pub struct IndexStats {
     pub sessions: usize,
     pub last_scan: Option<DateTime<Utc>>,
     pub scanning: bool,
+    pub indexing_search: bool,
     pub total_usage: Usage,
 }
 
@@ -53,6 +54,7 @@ mod tests {
             sessions: 7,
             last_scan: None,
             scanning: false,
+            indexing_search: false,
             total_usage: Usage {
                 input: 1,
                 cache_creation: 2,
@@ -68,6 +70,7 @@ mod tests {
                 "sessions": 7,
                 "last_scan": null,
                 "scanning": false,
+                "indexing_search": false,
                 "total_usage": {
                     "input": 1,
                     "cache_creation": 2,

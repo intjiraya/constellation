@@ -4,3 +4,4 @@ pub mod index;
 pub mod parser;
 pub mod pty;
 pub mod scanner;
+pub mod search;

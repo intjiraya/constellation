@@ -7,8 +7,41 @@ use chrono::{DateTime, Utc};
 use parking_lot::{Mutex, RwLock};
 use tracing::error;
 
-use crate::parser::SessionMeta;
+use crate::parser::{SessionMeta, parse_session};
 use crate::scanner::{ProjectInfo, default_root, scan_projects};
+use crate::search::SearchIndex;
+
+fn parse_session_bodies_parallel(refs: &[(String, std::path::PathBuf)]) -> Vec<(String, String)> {
+    if refs.is_empty() {
+        return Vec::new();
+    }
+    let workers = std::thread::available_parallelism()
+        .map(|n| n.get())
+        .unwrap_or(4)
+        .min(refs.len());
+    let chunk_size = refs.len().div_ceil(workers);
+    std::thread::scope(|scope| {
+        let handles: Vec<_> = refs
+            .chunks(chunk_size)
+            .map(|chunk| {
+                scope.spawn(move || {
+                    chunk
+                        .iter()
+                        .map(|(id, path)| {
+                            let session = parse_session(path);
+                            (id.clone(), session.indexable_text())
+                        })
+                        .collect::<Vec<_>>()
+                })
+            })
+            .collect();
+        let mut out = Vec::with_capacity(refs.len());
+        for h in handles {
+            out.extend(h.join().expect("parse worker panicked"));
+        }
+        out
+    })
+}
 
 #[derive(Default)]
 pub struct Snapshot {
@@ -16,6 +49,7 @@ pub struct Snapshot {
     pub by_project: HashMap<String, usize>,
     pub by_session_id: HashMap<String, SessionMeta>,
     pub last_scan: Option<DateTime<Utc>>,
+    pub search_index: Arc<SearchIndex>,
 }
 
 impl Snapshot {
@@ -63,6 +97,7 @@ pub struct Index {
     root: PathBuf,
     state: Arc<RwLock<Snapshot>>,
     scanning: Arc<Mutex<bool>>,
+    indexing_search: Arc<Mutex<bool>>,
 
     rebuild_lock: Arc<Mutex<()>>,
 }
@@ -73,6 +108,7 @@ impl Index {
             root,
             state: Arc::new(RwLock::new(Snapshot::default())),
             scanning: Arc::new(Mutex::new(false)),
+            indexing_search: Arc::new(Mutex::new(false)),
             rebuild_lock: Arc::new(Mutex::new(())),
         }
     }
@@ -89,26 +125,79 @@ impl Index {
         *self.scanning.lock()
     }
 
+    pub fn is_indexing_search(&self) -> bool {
+        *self.indexing_search.lock()
+    }
+
+    #[tracing::instrument(skip(self), fields(root = ?self.root))]
     pub fn rebuild(&self) {
         let _serialise = self.rebuild_lock.lock();
         let _flag = ScanFlag::set(&self.scanning);
+        let started = std::time::Instant::now();
 
         let projects = scan_projects(&self.root);
         let mut by_project = HashMap::with_capacity(projects.len());
         let mut by_session = HashMap::new();
+        let mut session_refs: Vec<(String, std::path::PathBuf)> = Vec::new();
+
         for (idx, p) in projects.iter().enumerate() {
             by_project.insert(p.sanitized_name.clone(), idx);
             for s in &p.sessions {
                 by_session.insert(s.id.clone(), s.clone());
+                session_refs.push((s.id.clone(), s.path.clone()));
             }
         }
-        let new_snap = Snapshot {
-            projects,
-            by_project,
-            by_session_id: by_session,
-            last_scan: Some(Utc::now()),
-        };
-        *self.state.write() = new_snap;
+
+        let project_count = projects.len();
+        let session_count = by_session.len();
+
+        {
+            let mut state = self.state.write();
+            *state = Snapshot {
+                projects,
+                by_project,
+                by_session_id: by_session,
+                last_scan: Some(Utc::now()),
+                search_index: Arc::new(SearchIndex::default()),
+            };
+        }
+        let metadata_elapsed = started.elapsed();
+        tracing::info!(
+            project_count,
+            session_count,
+            elapsed_ms = metadata_elapsed.as_millis() as u64,
+            "rebuild metadata-phase complete",
+        );
+
+        *self.indexing_search.lock() = true;
+        let search_started = std::time::Instant::now();
+        let pairs = parse_session_bodies_parallel(&session_refs);
+        let mut search_index = SearchIndex::default();
+        for (id, body) in pairs {
+            if !body.is_empty() {
+                search_index.add(id, body);
+            }
+        }
+        {
+            let mut state = self.state.write();
+            state.search_index = Arc::new(search_index);
+        }
+        *self.indexing_search.lock() = false;
+
+        tracing::info!(
+            project_count,
+            session_count,
+            metadata_ms = metadata_elapsed.as_millis() as u64,
+            search_ms = search_started.elapsed().as_millis() as u64,
+            total_ms = started.elapsed().as_millis() as u64,
+            "rebuild complete",
+        );
+        if session_count == 0 && project_count > 0 {
+            tracing::warn!(
+                project_count,
+                "indexed projects but found zero sessions — root may contain only empty projects",
+            );
+        }
     }
 
     pub async fn rebuild_async(&self) -> Result<(), tokio::task::JoinError> {
@@ -194,6 +283,21 @@ mod tests {
         let idx = Index::new(tmp.path().to_owned());
         idx.rebuild();
         assert!(!idx.is_scanning());
+        assert!(!idx.is_indexing_search());
+    }
+
+    #[test]
+    fn rebuild_populates_search_index_with_session_bodies() {
+        let tmp = TempDir::new().unwrap();
+        seed(&tmp.path().join("-x"), "with_tools.jsonl", "tools-uuid");
+        let idx = Index::new(tmp.path().to_owned());
+        idx.rebuild();
+
+        let snap = idx.read();
+        let hits = snap.search_index.search(&["readme".to_string()], 50);
+        assert_eq!(hits.len(), 1);
+        assert_eq!(hits[0].session_id, "tools-uuid");
+        assert!(!hits[0].snippets.is_empty());
     }
 
     #[test]
