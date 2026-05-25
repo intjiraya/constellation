@@ -7,16 +7,29 @@ authors = ["Jiraya <177346249+intjiraya@users.noreply.github.com>"]
 description = "A local web UI to browse and resume every Claude Code chat across all your projects"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/intjiraya/constellation"
+homepage = "https://github.com/intjiraya/constellation"
+documentation = "https://docs.rs/constellation"
 readme = "README.md"
 keywords = ["claude", "claude-code", "anthropic", "tui", "history"]
 categories = ["command-line-utilities", "development-tools"]
+include = [
+    "src/**/*.rs",
+    "static/**/*",
+    "tests/**/*.rs",
+    "tests/fixtures/**/*.jsonl",
+    "README.md",
+    "LICENSE-MIT",
+    "LICENSE-APACHE",
+    "CHANGELOG.md",
+    "Cargo.toml",
+    "Cargo.lock",
+]
 
 [[bin]]
 name = "cchats"
 path = "src/main.rs"
 
 [dependencies]
-
 tokio = { version = "1.52", features = ["full"] }
 tokio-util = { version = "0.7", features = ["io"] }
 futures = "0.3"
@@ -58,3 +71,7 @@ panic = "abort"
 
 [profile.dev]
 opt-level = 1
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]

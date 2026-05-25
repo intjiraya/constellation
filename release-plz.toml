@@ -1,0 +1,64 @@
+[workspace]
+allow_dirty = false
+changelog_update = true
+git_release_enable = false
+publish = false
+semver_check = true
+dependencies_update = false
+
+[changelog]
+header = """\
+# Changelog
+
+All notable changes to this project will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+"""
+trim = true
+body = """
+
+## [{{ version | trim_start_matches(pat="v") }}]\
+    {%- if release_link -%}\
+        ({{ release_link }})\
+    {% endif %} \
+    - {{ timestamp | date(format="%Y-%m-%d") }}
+{% for group, commits in commits | group_by(attribute="group") %}
+### {{ group | upper_first }}
+{% for commit in commits %}
+{%- if commit.scope -%}
+- *({{commit.scope}})* {% if commit.breaking %}[**breaking**] {% endif %}\
+    {{ commit.message }}{{ self::username(commit=commit) }}\
+    {%- if commit.links %} ({% for link in commit.links %}[{{link.text}}]({{link.href}}) {% endfor -%}){% endif %}
+{% else -%}
+- {% if commit.breaking %}[**breaking**] {% endif %}\
+    {{ commit.message }}{{ self::username(commit=commit) }}
+{% endif -%}
+{% endfor -%}
+{% endfor %}
+{%- macro username(commit) -%}
+    {% if commit.remote.username %} - by @{{ commit.remote.username }}{% endif -%}
+{% endmacro -%}
+"""
+commit_parsers = [
+    { message = "^feat",       group = "Added" },
+    { message = "^fix",        group = "Fixed" },
+    { message = "^perf",       group = "Performance" },
+    { message = "^refactor",   group = "Changed" },
+    { message = "^style",      skip = true },
+    { message = "^docs",       group = "Documentation" },
+    { message = "^chore\\(deps\\)", group = "Dependencies" },
+    { message = "^chore",      skip = true },
+    { message = "^ci",         skip = true },
+    { message = "^test",       skip = true },
+    { message = "^build",      group = "Build" },
+    { body = ".*security",     group = "Security" },
+    { message = "^revert",     group = "Reverted" },
+]
+protect_breaking_commits = true
+sort_commits = "oldest"
+
+[[package]]
+name = "constellation"
+changelog_path = "./CHANGELOG.md"

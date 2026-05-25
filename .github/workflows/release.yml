@@ -1,0 +1,190 @@
+name: release
+
+on:
+  push:
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+"
+      - "v[0-9]+.[0-9]+.[0-9]+-*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0
+  RUST_BACKTRACE: 1
+  BIN_NAME: cchats
+
+jobs:
+  build:
+    name: build (${{ matrix.target }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-gnu
+            runner: ubuntu-22.04
+            use_cross: false
+            archive: tar.xz
+            exe: ""
+          - target: x86_64-unknown-linux-musl
+            runner: ubuntu-latest
+            use_cross: true
+            archive: tar.xz
+            exe: ""
+          - target: aarch64-unknown-linux-gnu
+            runner: ubuntu-latest
+            use_cross: true
+            archive: tar.xz
+            exe: ""
+          - target: aarch64-unknown-linux-musl
+            runner: ubuntu-latest
+            use_cross: true
+            archive: tar.xz
+            exe: ""
+          - target: x86_64-apple-darwin
+            runner: macos-13
+            use_cross: false
+            archive: tar.xz
+            exe: ""
+          - target: aarch64-apple-darwin
+            runner: macos-latest
+            use_cross: false
+            archive: tar.xz
+            exe: ""
+          - target: x86_64-pc-windows-msvc
+            runner: windows-latest
+            use_cross: false
+            archive: zip
+            exe: ".exe"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.target }}
+
+      - name: install cross
+        if: matrix.use_cross
+        run: cargo install cross --git https://github.com/cross-rs/cross --locked
+
+      - name: build (cargo)
+        if: ${{ !matrix.use_cross }}
+        env:
+          TARGET: ${{ matrix.target }}
+        shell: bash
+        run: cargo build --release --locked --target "$TARGET"
+
+      - name: build (cross)
+        if: matrix.use_cross
+        env:
+          TARGET: ${{ matrix.target }}
+        shell: bash
+        run: cross build --release --locked --target "$TARGET"
+
+      - name: stage release files
+        env:
+          TARGET: ${{ matrix.target }}
+          EXE: ${{ matrix.exe }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="${GITHUB_REF_NAME#v}"
+          stage="constellation-${version}-${TARGET}"
+          mkdir -p "dist/${stage}"
+          cp "target/${TARGET}/release/${BIN_NAME}${EXE}" "dist/${stage}/"
+          cp README.md LICENSE-MIT LICENSE-APACHE CHANGELOG.md "dist/${stage}/"
+
+      - name: archive tar.xz
+        if: matrix.archive == 'tar.xz'
+        env:
+          TARGET: ${{ matrix.target }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="${GITHUB_REF_NAME#v}"
+          stage="constellation-${version}-${TARGET}"
+          tar -C dist -cJf "dist/${stage}.tar.xz" "${stage}"
+
+      - name: archive zip
+        if: matrix.archive == 'zip'
+        env:
+          TARGET: ${{ matrix.target }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="${GITHUB_REF_NAME#v}"
+          stage="constellation-${version}-${TARGET}"
+          cd dist && 7z a "${stage}.zip" "${stage}"
+
+      - name: checksum
+        env:
+          TARGET: ${{ matrix.target }}
+          ARCHIVE_EXT: ${{ matrix.archive }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="${GITHUB_REF_NAME#v}"
+          stage="constellation-${version}-${TARGET}"
+          cd dist
+          if [[ "$RUNNER_OS" == "macOS" ]]; then
+            shasum -a 256 "${stage}.${ARCHIVE_EXT}" > "${stage}.${ARCHIVE_EXT}.sha256"
+          else
+            sha256sum "${stage}.${ARCHIVE_EXT}" > "${stage}.${ARCHIVE_EXT}.sha256"
+          fi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: constellation-${{ matrix.target }}
+          path: |
+            dist/*.tar.xz
+            dist/*.zip
+            dist/*.sha256
+          if-no-files-found: error
+          retention-days: 7
+
+  release:
+    name: github release
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: generate release notes from CHANGELOG.md
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="${GITHUB_REF_NAME#v}"
+          awk -v ver="$version" '
+            /^## \[/ {
+              if (in_section) exit
+              if ($0 ~ "\\[" ver "\\]") { in_section=1; next }
+            }
+            in_section { print }
+          ' CHANGELOG.md > release-notes.md || true
+          if [[ ! -s release-notes.md ]]; then
+            echo "Release ${version}." > release-notes.md
+          fi
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
+          body_path: release-notes.md
+          fail_on_unmatched_files: true
+          files: |
+            artifacts/*.tar.xz
+            artifacts/*.zip
+            artifacts/*.sha256

@@ -1,0 +1,41 @@
+name: Feature request
+description: Suggest an improvement or new capability.
+title: "[feat] "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the idea. Please describe the *problem* you want to solve
+        first, then a proposed solution. PRs without a prior discussion may
+        be rejected if the approach does not align with the project goals.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does this solve?
+      placeholder: When I have 50+ projects the rail becomes hard to navigate by mouse.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      placeholder: A keyboard shortcut to filter projects by typed text.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      placeholder: Could lean on the existing search field, but it's wired to chats not projects.
+
+  - type: checkboxes
+    id: scope
+    attributes:
+      label: Scope check
+      options:
+        - label: I'm willing to send a PR for this.
+        - label: I'd like to discuss the approach before any code is written.
