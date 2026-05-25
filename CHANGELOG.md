@@ -17,6 +17,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - *(packaging)* document automated AUR flow, drop manual-flow emphasis
 
+## [0.1.1](https://github.com/intjiraya/constellation/compare/v0.1.0...v0.1.1) - 2026-05-25
+
+Maintenance release. CI / release-pipeline plumbing only, no user-visible changes.
+
 ## [0.1.0] - 2026-05-25
 
 ### Added
