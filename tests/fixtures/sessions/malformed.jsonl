@@ -1,0 +1,5 @@
+{"type":"ai-title","aiTitle":"Survives broken lines","sessionId":"mal-uuid"}
+not json at all
+{"type":"user","message":{"role":"user","content":"Still parses good lines."},"uuid":"u-1","timestamp":"2026-05-25T14:00:00.000Z","sessionId":"mal-uuid","cwd":"/x"}
+{partial: broken
+{"type":"assistant","message":{"model":"claude-opus-4-7","role":"assistant","content":[{"type":"text","text":"OK."}]},"uuid":"a-1","timestamp":"2026-05-25T14:00:01.000Z","sessionId":"mal-uuid"}

@@ -1,0 +1,5 @@
+{"type":"ai-title","aiTitle":"Look at the project structure","sessionId":"tools-uuid"}
+{"type":"user","message":{"role":"user","content":"List the files in the project root."},"uuid":"u-1","timestamp":"2026-05-25T11:00:00.000Z","sessionId":"tools-uuid","cwd":"/srv/app"}
+{"type":"assistant","message":{"model":"claude-sonnet-4-6","role":"assistant","content":[{"type":"thinking","thinking":"I should use ls to look at the structure."},{"type":"text","text":"I'll list the project root."},{"type":"tool_use","id":"tu-1","name":"Bash","input":{"command":"ls -la","description":"List files"}}]},"uuid":"a-1","timestamp":"2026-05-25T11:00:02.000Z","sessionId":"tools-uuid"}
+{"type":"user","message":{"role":"user","content":[{"tool_use_id":"tu-1","type":"tool_result","content":"total 12\ndrwxr-xr-x  3 root root 4096 May 25 11:00 .\nREADME.md","is_error":false}]},"uuid":"u-2","timestamp":"2026-05-25T11:00:03.000Z","sessionId":"tools-uuid","cwd":"/srv/app"}
+{"type":"assistant","message":{"model":"claude-sonnet-4-6","role":"assistant","content":[{"type":"text","text":"Just a README so far."}]},"uuid":"a-2","timestamp":"2026-05-25T11:00:05.000Z","sessionId":"tools-uuid"}

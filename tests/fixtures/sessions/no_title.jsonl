@@ -1,0 +1,2 @@
+{"type":"user","message":{"role":"user","content":"This session has no ai-title record, just plain user input."},"uuid":"u-1","timestamp":"2026-05-25T12:00:00.000Z","sessionId":"notitle-uuid","cwd":"/var/x"}
+{"type":"assistant","message":{"model":"claude-haiku-4-5-20251001","role":"assistant","content":[{"type":"text","text":"Acknowledged."}]},"uuid":"a-1","timestamp":"2026-05-25T12:00:01.000Z","sessionId":"notitle-uuid"}

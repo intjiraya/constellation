@@ -1,0 +1,60 @@
+[package]
+name = "constellation"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+authors = ["Jiraya <177346249+intjiraya@users.noreply.github.com>"]
+description = "A local web UI to browse and resume every Claude Code chat across all your projects"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/intjiraya/constellation"
+readme = "README.md"
+keywords = ["claude", "claude-code", "anthropic", "tui", "history"]
+categories = ["command-line-utilities", "development-tools"]
+
+[[bin]]
+name = "cchats"
+path = "src/main.rs"
+
+[dependencies]
+
+tokio = { version = "1.52", features = ["full"] }
+tokio-util = { version = "0.7", features = ["io"] }
+futures = "0.3"
+
+axum = { version = "0.8.9", features = ["ws", "macros"] }
+tower = "0.5"
+tower-http = { version = "0.6", features = ["trace", "fs"] }
+
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0"
+
+rust-embed = { version = "8.11", features = ["mime-guess"] }
+mime_guess = "2.0"
+
+portable-pty = "0.9"
+
+clap = { version = "4.6", features = ["derive"] }
+
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+chrono = { version = "0.4", features = ["serde"] }
+anyhow = "1.0"
+thiserror = "2.0"
+parking_lot = "0.12"
+dirs = "6.0"
+open = "5.3"
+
+[dev-dependencies]
+tempfile = "3.27"
+pretty_assertions = "1.4"
+
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+strip = "symbols"
+panic = "abort"
+
+[profile.dev]
+opt-level = 1

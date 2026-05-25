@@ -1,0 +1,5 @@
+{"type":"ai-title","aiTitle":"Test conversation about parsers","sessionId":"minimal-uuid"}
+{"type":"user","message":{"role":"user","content":"Hello, can you explain JSONL?"},"uuid":"u-1","timestamp":"2026-05-25T10:00:00.000Z","sessionId":"minimal-uuid","cwd":"/home/test/proj"}
+{"type":"assistant","message":{"model":"claude-opus-4-7","role":"assistant","content":[{"type":"text","text":"JSONL is JSON Lines — one JSON object per line."}]},"uuid":"a-1","timestamp":"2026-05-25T10:00:05.000Z","sessionId":"minimal-uuid"}
+{"type":"user","message":{"role":"user","content":"Got it, thanks!"},"uuid":"u-2","timestamp":"2026-05-25T10:00:10.000Z","sessionId":"minimal-uuid","cwd":"/home/test/proj"}
+{"type":"assistant","message":{"model":"claude-opus-4-7","role":"assistant","content":[{"type":"text","text":"You're welcome."}]},"uuid":"a-2","timestamp":"2026-05-25T10:00:15.000Z","sessionId":"minimal-uuid"}

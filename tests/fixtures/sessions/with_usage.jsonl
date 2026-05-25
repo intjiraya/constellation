@@ -1,0 +1,5 @@
+{"type":"ai-title","aiTitle":"Counting tokens","sessionId":"usage-uuid"}
+{"type":"user","message":{"role":"user","content":"first"},"uuid":"u-1","timestamp":"2026-05-25T10:00:00.000Z","sessionId":"usage-uuid","cwd":"/u"}
+{"type":"assistant","message":{"model":"claude-opus-4-7","role":"assistant","content":[{"type":"text","text":"one"}],"usage":{"input_tokens":10,"output_tokens":100,"cache_creation_input_tokens":500,"cache_read_input_tokens":1000}},"uuid":"a-1","timestamp":"2026-05-25T10:00:01.000Z","sessionId":"usage-uuid"}
+{"type":"user","message":{"role":"user","content":"second"},"uuid":"u-2","timestamp":"2026-05-25T10:00:02.000Z","sessionId":"usage-uuid","cwd":"/u"}
+{"type":"assistant","message":{"model":"claude-opus-4-7","role":"assistant","content":[{"type":"text","text":"two"}],"usage":{"input_tokens":5,"output_tokens":200,"cache_creation_input_tokens":0,"cache_read_input_tokens":1500}},"uuid":"a-2","timestamp":"2026-05-25T10:00:03.000Z","sessionId":"usage-uuid"}
