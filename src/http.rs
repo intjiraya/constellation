@@ -18,6 +18,7 @@ use crate::dto::{IndexStats, ProjectOut};
 use crate::index::Index;
 use crate::parser::{SessionMeta, Usage, parse_session};
 use crate::pty::{spawn_new_chat_bridge, spawn_resume_bridge};
+use crate::search::{SearchHit, tokenize_text};
 
 #[derive(RustEmbed)]
 #[folder = "static/"]
@@ -74,6 +75,17 @@ pub struct ResumeQuery {
     pub fork: bool,
 }
 
+#[derive(Debug, Deserialize, Default)]
+pub struct SearchQueryParams {
+    #[serde(default)]
+    pub q: String,
+    #[serde(default)]
+    pub limit: Option<usize>,
+}
+
+const DEFAULT_SEARCH_LIMIT: usize = 50;
+const MAX_SEARCH_LIMIT: usize = 200;
+
 pub fn build_router(state: AppState) -> Router {
     let ws_routes = Router::new()
         .route("/api/projects/{sanitized_name}/new-chat", get(ws_new_chat))
@@ -88,7 +100,9 @@ pub fn build_router(state: AppState) -> Router {
             "/api/projects/{sanitized_name}/sessions",
             get(list_project_sessions),
         )
-        .route("/api/sessions/{session_id}", get(get_session));
+        .route("/api/sessions/{session_id}", get(get_session))
+        .route("/api/search", get(get_search))
+        .layer(middleware::from_fn(reject_dns_rebinding));
 
     Router::new()
         .merge(api_routes)
@@ -140,6 +154,40 @@ async fn reject_non_loopback_origin(req: axum::extract::Request, next: Next) -> 
     next.run(req).await
 }
 
+async fn reject_dns_rebinding(req: axum::extract::Request, next: Next) -> Response {
+    let headers = req.headers();
+    if !host_is_loopback(headers) {
+        warn!(
+            host = ?headers.get(header::HOST),
+            "rejecting: non-loopback Host header (possible DNS rebinding)",
+        );
+        return (StatusCode::FORBIDDEN, "host not allowed").into_response();
+    }
+    if headers.get(header::ORIGIN).is_some() && !origin_is_loopback(headers) {
+        warn!(
+            origin = ?headers.get(header::ORIGIN),
+            "rejecting: non-loopback Origin header",
+        );
+        return (StatusCode::FORBIDDEN, "origin not allowed").into_response();
+    }
+    next.run(req).await
+}
+
+fn host_is_loopback(headers: &HeaderMap) -> bool {
+    let Some(host) = headers.get(header::HOST).and_then(|v| v.to_str().ok()) else {
+        return false;
+    };
+    let host_only = if let Some(stripped) = host.strip_prefix('[') {
+        match stripped.split_once(']') {
+            Some((h, _)) => h,
+            None => return false,
+        }
+    } else {
+        host.split_once(':').map(|(h, _)| h).unwrap_or(host)
+    };
+    host_only == "127.0.0.1" || host_only == "localhost" || host_only == "::1"
+}
+
 fn origin_is_loopback(headers: &HeaderMap) -> bool {
     let Some(origin) = headers.get(header::ORIGIN).and_then(|v| v.to_str().ok()) else {
         return false;
@@ -186,6 +234,7 @@ fn build_index_stats(state: &AppState) -> IndexStats {
         sessions: snap.session_count(),
         last_scan: snap.last_scan,
         scanning: state.index.is_scanning(),
+        indexing_search: state.index.is_indexing_search(),
         total_usage,
     }
 }
@@ -256,6 +305,31 @@ async fn get_session(
         bytes
     };
     Ok(([(header::CONTENT_TYPE, "application/json")], json).into_response())
+}
+
+#[instrument(skip_all, fields(term_count, limit = ?q.limit))]
+async fn get_search(
+    State(s): State<AppState>,
+    Query(q): Query<SearchQueryParams>,
+) -> Result<Json<Vec<SearchHit>>, StatusCode> {
+    let terms: Vec<String> = tokenize_text(&q.q);
+    tracing::Span::current().record("term_count", terms.len());
+    if terms.is_empty() {
+        return Ok(Json(Vec::new()));
+    }
+    let limit = q
+        .limit
+        .unwrap_or(DEFAULT_SEARCH_LIMIT)
+        .clamp(1, MAX_SEARCH_LIMIT);
+
+    let index = s.index.read().search_index.clone();
+    let hits = tokio::task::spawn_blocking(move || index.search(&terms, limit))
+        .await
+        .map_err(|e| {
+            error!(error = %e, "search task panicked");
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
+    Ok(Json(hits))
 }
 
 async fn ws_resume(

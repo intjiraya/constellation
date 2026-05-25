@@ -121,6 +121,47 @@ pub struct Session {
     pub turns: Vec<Turn>,
 }
 
+impl Session {
+    pub fn indexable_text(&self) -> String {
+        let mut buf = String::new();
+        for turn in &self.turns {
+            for block in &turn.blocks {
+                match block {
+                    Block::Text { text } | Block::Thinking { text } => {
+                        if !text.is_empty() {
+                            buf.push_str(text);
+                            buf.push('\n');
+                        }
+                    }
+                    Block::ToolUse {
+                        tool_name,
+                        tool_input,
+                        ..
+                    } => {
+                        if !tool_name.is_empty() {
+                            buf.push_str(tool_name);
+                            buf.push('\n');
+                        }
+                        if !tool_input.is_null() {
+                            if let Ok(s) = serde_json::to_string(tool_input) {
+                                buf.push_str(&s);
+                                buf.push('\n');
+                            }
+                        }
+                    }
+                    Block::ToolResult { tool_output, .. } => {
+                        if !tool_output.is_empty() {
+                            buf.push_str(tool_output);
+                            buf.push('\n');
+                        }
+                    }
+                }
+            }
+        }
+        buf
+    }
+}
+
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct RawAiTitle {
@@ -563,6 +604,25 @@ mod tests {
 
     fn fp(name: &str) -> PathBuf {
         fixtures().join(name)
+    }
+
+    #[test]
+    fn indexable_text_collects_all_block_kinds() {
+        let session = parse_session(&fp("with_tools.jsonl"));
+        let text = session.indexable_text();
+
+        assert!(text.contains("List the files"), "user text");
+        assert!(text.contains("I should use ls"), "thinking");
+        assert!(text.contains("project root"), "assistant text");
+        assert!(text.contains("Bash"), "tool name");
+        assert!(text.contains("ls -la"), "tool input");
+        assert!(text.contains("README.md"), "tool output");
+    }
+
+    #[test]
+    fn indexable_text_empty_session() {
+        let session = parse_session(&fp("empty.jsonl"));
+        assert_eq!(session.indexable_text(), "");
     }
 
     #[test]

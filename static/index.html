@@ -45,7 +45,13 @@
     </div>
     <div class="search">
       <span class="ic">/</span>
-      <input id="search" placeholder="search conversations…" autocomplete="off" spellcheck="false" />
+      <input
+        id="search"
+        placeholder="search · multi-term, project:, model:, has:, before:, after:"
+        title="multi-term AND across title / snippet / id / cwd / model / project&#10;operators:&#10;  project:foo     — restrict to a project&#10;  model:opus      — restrict to a model&#10;  has:tool        — has tool calls&#10;  has:cache       — has cached tokens&#10;  has:model       — has a model assigned&#10;  before:YYYY-MM-DD&#10;  after:YYYY-MM-DD&#10;use quotes for phrases: project:&quot;my project&quot;"
+        autocomplete="off"
+        spellcheck="false"
+      />
       <span class="kbd">⌘K</span>
     </div>
     <div class="tb-actions">

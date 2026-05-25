@@ -1,3 +1,15 @@
+import {
+  parseQuery,
+  matches,
+  highlightSegments,
+  segmentsFromRanges,
+} from "./search.mjs";
+
+const SEARCH_DEBOUNCE_MS = 120;
+const SEARCH_STORAGE_KEY = "constellation.search";
+const DEFAULT_SEARCH_LIMIT = 50;
+const SEARCH_FETCH_TIMEOUT_MS = 10000;
+
 const state = {
   projects: [],
   activeProject: null,
@@ -12,11 +24,17 @@ const state = {
 };
 
 async function api(path, opts = {}) {
-  const res = await fetch(path, opts);
-  if (!res.ok) {
-    throw new Error(`${res.status} ${res.statusText} — ${path}`);
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), opts.timeoutMs ?? SEARCH_FETCH_TIMEOUT_MS);
+  try {
+    const res = await fetch(path, { ...opts, signal: ctrl.signal });
+    if (!res.ok) {
+      throw new Error(`${res.status} ${res.statusText} — ${path}`);
+    }
+    return await res.json();
+  } finally {
+    clearTimeout(timer);
   }
-  return res.json();
 }
 
 function wsUrl(path) {
@@ -30,6 +48,8 @@ const API = {
   projects: ()      => api("/api/projects"),
   sessions: (proj)  => api(`/api/projects/${encodeURIComponent(proj)}/sessions`),
   session:  (id)    => api(`/api/sessions/${encodeURIComponent(id)}`),
+  search:   (q, limit = 200) =>
+    api(`/api/search?q=${encodeURIComponent(q)}&limit=${limit}`),
   resumeWsUrl:  (id, fork) =>
     wsUrl(`/api/sessions/${encodeURIComponent(id)}/pty${fork ? "?fork=true" : ""}`),
   newChatWsUrl: (proj) => wsUrl(`/api/projects/${encodeURIComponent(proj)}/new-chat`),
@@ -165,6 +185,72 @@ function escapeHtmlText(s) {
   return div.innerHTML;
 }
 
+function debounce(fn, ms) {
+  let t;
+  return (...args) => {
+    clearTimeout(t);
+    t = setTimeout(() => fn(...args), ms);
+  };
+}
+
+let _allSessionsPromise = null;
+
+function _fetchAllSessions() {
+  const failures = [];
+  return Promise.all(
+    state.projects.map((p) =>
+      API.sessions(p.sanitized_name)
+        .then((sessions) =>
+          sessions.map((s) => ({
+            ...s,
+            _project: {
+              sanitized_name: p.sanitized_name,
+              display_path: p.display_path,
+              cwd: p.cwd,
+            },
+          })),
+        )
+        .catch((err) => {
+          failures.push({ project: p.sanitized_name, err: String(err) });
+          return [];
+        }),
+    ),
+  ).then((results) => {
+    const all = results.flat();
+    all.sort((a, b) => new Date(b.last_at || 0) - new Date(a.last_at || 0));
+    if (failures.length) {
+      console.warn("ensureAllSessions: failed projects", failures);
+    }
+    return { sessions: all, failures };
+  });
+}
+
+function ensureAllSessions() {
+  if (!_allSessionsPromise) {
+    _allSessionsPromise = _fetchAllSessions();
+  }
+  return _allSessionsPromise;
+}
+
+function invalidateAllSessions() {
+  _allSessionsPromise = null;
+}
+
+function persistSearch(q) {
+  try {
+    if (q) localStorage.setItem(SEARCH_STORAGE_KEY, q);
+    else localStorage.removeItem(SEARCH_STORAGE_KEY);
+  } catch {}
+}
+
+function loadPersistedSearch() {
+  try {
+    return localStorage.getItem(SEARCH_STORAGE_KEY) || "";
+  } catch {
+    return "";
+  }
+}
+
 function renderRail() {
   const list = $("#proj-list");
   list.innerHTML = "";
@@ -213,11 +299,14 @@ function appendPath(parent, path) {
   }
 }
 
-function renderChatList(sessions) {
+function renderChatList(sessions, options = {}) {
   const root = $("#chat-list");
   root.innerHTML = "";
   if (!sessions || sessions.length === 0) {
-    root.appendChild(el("div", { class: "placeholder" }, "no conversations"));
+    const msg = options.highlightTerms?.length
+      ? "no matches"
+      : "no conversations";
+    root.appendChild(el("div", { class: "placeholder" }, msg));
     return;
   }
 
@@ -228,11 +317,35 @@ function renderChatList(sessions) {
       root.appendChild(el("div", { class: "day" }, label));
       prevLabel = label;
     }
-    root.appendChild(renderChatRow(s));
+    root.appendChild(renderChatRow(s, options));
   }
 }
 
-function renderChatRow(s) {
+function segmentsToNode(segments) {
+  const node = document.createElement("span");
+  for (const seg of segments) {
+    if (seg.match) {
+      const mark = document.createElement("mark");
+      mark.textContent = seg.text;
+      node.appendChild(mark);
+    } else if (seg.text) {
+      node.appendChild(document.createTextNode(seg.text));
+    }
+  }
+  return node;
+}
+
+function withHighlight(text, terms) {
+  return segmentsToNode(highlightSegments(text || "", terms));
+}
+
+function withRangeHighlight(text, ranges) {
+  return segmentsToNode(segmentsFromRanges(text || "", ranges));
+}
+
+function renderChatRow(s, options = {}) {
+  const terms = options.highlightTerms || [];
+  const backendSnippets = options.snippetsById?.get(s.id) || null;
   const total = tokensTotal(s.usage);
   const metaChildren = [
     el("span", {}, `${s.message_count} msgs`),
@@ -252,6 +365,32 @@ function renderChatRow(s) {
     metaChildren.push(el("span", { class: "sep" }, "·"));
     metaChildren.push(el("span", {}, s.model));
   }
+
+  const titleNode = el("div", { class: "title", title: s.title });
+  titleNode.appendChild(withHighlight(s.title || "(untitled)", terms));
+
+  const children = [titleNode];
+
+  if (backendSnippets?.length) {
+    for (const snip of backendSnippets.slice(0, 2)) {
+      const snipNode = el("div", { class: "snippet body" });
+      snipNode.appendChild(withRangeHighlight(snip.text || "", snip.matches));
+      children.push(snipNode);
+    }
+  } else {
+    const snippetNode = el("div", { class: "snippet" });
+    snippetNode.appendChild(withHighlight(s.snippet || "—", terms));
+    children.push(snippetNode);
+  }
+
+  if (options.showProject && s._project?.display_path) {
+    const chip = el("div", { class: "proj-chip", title: s._project.cwd || "" });
+    chip.appendChild(withHighlight(s._project.display_path, terms));
+    children.push(chip);
+  }
+
+  children.push(el("div", { class: "meta" }, ...metaChildren));
+
   return el(
     "article",
     {
@@ -259,9 +398,7 @@ function renderChatRow(s) {
       "data-id": s.id,
       onclick: () => selectSession(s.id),
     },
-    el("div", { class: "title", title: s.title }, s.title || "(untitled)"),
-    el("div", { class: "snippet" }, s.snippet || "—"),
-    el("div", { class: "meta" }, ...metaChildren),
+    ...children,
   );
 }
 
@@ -459,17 +596,59 @@ async function selectSession(id) {
   }
 }
 
-function applySearchFilter() {
-  const q = state.searchQuery.trim().toLowerCase();
-  let filtered = state.sessions;
-  if (q) {
-    filtered = state.sessions.filter(s => {
-      return (s.title || "").toLowerCase().includes(q)
-        || (s.snippet || "").toLowerCase().includes(q)
-        || (s.id || "").toLowerCase().includes(q);
-    });
+let _searchSeq = 0;
+
+async function applySearchFilter() {
+  const seq = ++_searchSeq;
+  const q = state.searchQuery.trim();
+  if (!q) {
+    if (seq === _searchSeq) renderChatList(state.sessions);
+    return;
   }
-  renderChatList(filtered);
+
+  const parsed = parseQuery(q);
+  const { sessions: pool, failures } = await ensureAllSessions();
+  if (seq !== _searchSeq) return;
+
+  const opsOnly = { ...parsed, terms: [] };
+  const opFiltered = pool.filter((s) => matches(s, opsOnly));
+  const byId = new Map(opFiltered.map((s) => [s.id, s]));
+
+  let filtered;
+  const snippetsById = new Map();
+  const statusBits = [];
+  if (failures.length) statusBits.push(`${failures.length} projects unavailable`);
+
+  if (parsed.terms.length > 0) {
+    try {
+      const termsQuery = parsed.terms.join(" ");
+      const hits = await API.search(termsQuery, DEFAULT_SEARCH_LIMIT);
+      if (seq !== _searchSeq) return;
+      filtered = [];
+      for (const hit of hits) {
+        const session = byId.get(hit.session_id);
+        if (!session) continue;
+        filtered.push(session);
+        if (hit.snippets?.length) snippetsById.set(hit.session_id, hit.snippets);
+      }
+    } catch (e) {
+      if (seq !== _searchSeq) return;
+      console.warn("backend search failed, falling back to metadata only", e);
+      filtered = opFiltered.filter((s) => matches(s, parsed));
+      statusBits.push("metadata only — backend unavailable");
+    }
+  } else {
+    filtered = opFiltered;
+  }
+
+  if (seq !== _searchSeq) return;
+  renderChatList(filtered, {
+    highlightTerms: parsed.terms,
+    showProject: true,
+    snippetsById,
+  });
+  const suffix = statusBits.length ? ` · (${statusBits.join("; ")})` : "";
+  renderListHead(`search · ${q}${suffix}`, filtered);
 }
 
 function openTerminal(sessionId, { fork = false } = {}) {
@@ -654,14 +833,25 @@ function toast(msg, kind = "info") {
   }, 2400);
 }
 
+let _lastSeenScan = null;
+
 async function refreshStats() {
   try {
     const s = await API.stats();
+    if (_lastSeenScan && s.last_scan && s.last_scan !== _lastSeenScan) {
+      invalidateAllSessions();
+    }
+    _lastSeenScan = s.last_scan;
+
     const sysEl = $("#sys");
-    sysEl.classList.toggle("scanning", s.scanning);
+    sysEl.classList.toggle("scanning", s.scanning || s.indexing_search);
     sysEl.classList.remove("error");
     const totalTok = tokensTotal(s.total_usage);
-    const main = s.scanning ? "scanning…" : `${s.sessions} indexed`;
+    const main = s.scanning
+      ? "scanning…"
+      : s.indexing_search
+        ? "indexing search…"
+        : `${s.sessions} indexed`;
     const tokPart = totalTok > 0 ? ` · ${fmtTok(totalTok)} tok` : "";
     $("#sys-text").textContent = main + tokPart;
     const u = s.total_usage || {};
@@ -694,9 +884,11 @@ async function loadProjects(preferProject = null) {
 }
 
 function bindUi() {
+  const debouncedFilter = debounce(() => applySearchFilter(), SEARCH_DEBOUNCE_MS);
   $("#search").addEventListener("input", (e) => {
     state.searchQuery = e.target.value;
-    applySearchFilter();
+    persistSearch(state.searchQuery);
+    debouncedFilter();
   });
 
   document.addEventListener("keydown", (e) => {
@@ -730,6 +922,7 @@ function bindUi() {
     btn.textContent = "↻ scanning…";
     try {
       await API.reindex();
+      invalidateAllSessions();
       await refreshStats();
       await loadProjects(state.activeProject);
     } finally {
@@ -745,8 +938,14 @@ function bindUi() {
 
 async function main() {
   bindUi();
+  const persisted = loadPersistedSearch();
+  if (persisted) {
+    state.searchQuery = persisted;
+    $("#search").value = persisted;
+  }
   await refreshStats();
   await loadProjects();
+  if (state.searchQuery) await applySearchFilter();
   setInterval(refreshStats, 15000);
 }
 

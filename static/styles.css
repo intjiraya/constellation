@@ -320,6 +320,46 @@ a:hover { text-decoration: underline; }
   font-size: 0.875rem;
 }
 
+.chat .proj-chip {
+  display: inline-block;
+  max-width: 100%;
+  margin-bottom: 8px;
+  padding: 2px 8px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--bg-0);
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  color: var(--fg-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+mark {
+  background: var(--accent-soft);
+  color: var(--accent);
+  padding: 0 2px;
+  border-radius: 2px;
+  font-weight: 600;
+}
+.chat mark {
+  color: inherit;
+}
+
+.chat .snippet.body {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  line-height: 1.5;
+  color: var(--fg-mute);
+  border-left: 2px solid var(--accent-soft);
+  padding: 2px 0 2px 8px;
+  margin-bottom: 4px;
+  -webkit-line-clamp: 2;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 
 
 .stage {
