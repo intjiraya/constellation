@@ -20,8 +20,8 @@ Please use GitHub's private vulnerability reporting:
 2. Click **Report a vulnerability**
 3. Fill in the form with what you found and how to reproduce it
 
-If GitHub's form is unavailable, send a private message to
-[@intjiraya](https://github.com/intjiraya) on GitHub.
+If GitHub's form is unavailable, send a direct message on Discord to
+`@nugget.waffle`.
 
 ### What to include
 
