@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.4](https://github.com/intjiraya/constellation/compare/v0.1.3...v0.1.4) - 2026-05-25
+
+### Documentation
+
+- *(changelog)* drop bottom link refs (release-plz uses inline links in headers)
+
+### Fixed
+
+- *(changelog)* rewrite cleanly, drop custom header that caused duplication
+
 ## [0.1.3] - 2026-05-25
 
 No user-facing changes. Release / CI pipeline maintenance only.
