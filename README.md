@@ -96,15 +96,15 @@ cchats --root /custom/path    #  override ~/.claude/projects
 
 ## · features
 
-|                                         |                                                                                                                |
-| :-------------------------------------- | :------------------------------------------------------------------------------------------------------------- |
-| `every chat in one place`               | reads every `~/.claude/projects/<sanitized>/*.jsonl`, groups by project, sorts by recency                      |
-| `live resume in the browser`            | click → spawns `claude --resume <id>` inside a PTY, bridged through WebSocket → xterm.js                       |
-| `fork without scarring`                 | one-click `--fork-session` from any chat, original untouched                                                   |
-| `new chat from the rail`                | start a fresh `claude` session in any indexed project's cwd                                                    |
-| `token accounting`                      | input / cache-create / cache-read / output buckets, per chat, per project, all-up                              |
-| `single 3.2 MiB binary`                 | rust, no runtime, no node, no python — `rust-embed` ships every asset inside                                   |
-| `loopback-only, origin-checked`         | binds 127.0.0.1, rejects non-loopback `Origin`, strict CSP, vendored CDN scripts                               |
+| feature                           | what it does                                                                              |
+| :-------------------------------- | :---------------------------------------------------------------------------------------- |
+| `every chat in one place`         | reads every `~/.claude/projects/<sanitized>/*.jsonl`, groups by project, sorts by recency |
+| `live resume in the browser`      | click → spawns `claude --resume <id>` inside a PTY, bridged through WebSocket → xterm.js  |
+| `fork without scarring`           | one-click `--fork-session` from any chat, original untouched                              |
+| `new chat from the rail`          | start a fresh `claude` session in any indexed project's cwd                               |
+| `token accounting`                | input / cache-create / cache-read / output buckets, per chat, per project, all-up         |
+| `single 3.2 MiB binary`           | rust, no runtime, no node, no python — `rust-embed` ships every asset inside              |
+| `loopback-only, origin-checked`   | binds 127.0.0.1, rejects non-loopback `Origin`, strict CSP, vendored CDN scripts          |
 
 <br>
 
@@ -170,16 +170,18 @@ sequenceDiagram
 Measured on real data (152 sessions, 234 MiB JSONL).
 Same machine, same workload, against the prototype Python backend.
 
-|                     |          python |             rust |       Δ          |
-| :------------------ | --------------: | ---------------: | :--------------- |
-| cold start          |        1 360 ms |       **5.6 ms** | `−99.6%`         |
-| index ready (152)   |        1 366 ms |         **447 ms** | `−67.3%`         |
-| RSS idle            |         64 MiB |        **18.6 MiB** | `−71%`           |
-| `/api/stats` p50    |         0.42 ms |        **0.08 ms** | `−81%`           |
-| `/api/projects` p50 |         0.80 ms |        **0.14 ms** | `−83%`           |
-| big session parse   |           61 ms |          **27 ms** | `−56%`           |
-| reindex 234 MiB     |        1 060 ms |         **430 ms** | `−59%`           |
-| distribution        | needs python ≥3.10 | **2.7-3.2 MiB binary** | ✓                |
+| metric              |   python |          rust | delta  |
+| :------------------ | -------: | ------------: | :----- |
+| cold start          | 1 360 ms |    **5.6 ms** | −99.6% |
+| index ready (152)   | 1 366 ms |    **447 ms** | −67.3% |
+| RSS idle            |   64 MiB |  **18.6 MiB** | −71%   |
+| `/api/stats` p50    |  0.42 ms |   **0.08 ms** | −81%   |
+| `/api/projects` p50 |  0.80 ms |   **0.14 ms** | −83%   |
+| big session parse   |    61 ms |     **27 ms** | −56%   |
+| reindex 234 MiB     | 1 060 ms |    **430 ms** | −59%   |
+
+> **Distribution:** Python needs ≥ 3.10 + a venv. Rust ships as **a single
+> 2.7–3.2 MiB binary** with zero runtime dependencies beyond `libc`.
 
 <br>
 
@@ -188,14 +190,14 @@ Same machine, same workload, against the prototype Python backend.
 The frontend lives in the same threat model as `~/.claude/projects` itself,
 but everything that crosses a boundary is locked down.
 
-|                                                  |                                                            |
-| :----------------------------------------------- | :--------------------------------------------------------- |
-| `WebSocket Origin check`                         | rejects any non-loopback origin · same-machine pages can't attach to a live PTY |
-| `child env allowlist`                            | `TERM` / `PATH` / `HOME` only · no `ANTHROPIC_API_KEY` / AWS / GH tokens leak  |
-| `Content-Security-Policy`                        | `default-src 'self'` · `frame-ancestors 'none'` · all scripts vendored          |
-| `mandatory DOMPurify`                            | every `innerHTML` sanitised · text-only fallback when DP is missing             |
-| `canonical cwd guard`                            | PTY spawn refuses paths outside `$HOME`                                          |
-| `host validation`                                | loud `stderr` warning on `--host` outside loopback                              |
+| control                     | what it gives you                                                               |
+| :-------------------------- | :------------------------------------------------------------------------------ |
+| `WebSocket Origin check`    | rejects any non-loopback origin · same-machine pages can't attach to a live PTY |
+| `child env allowlist`       | `TERM` / `PATH` / `HOME` only · no `ANTHROPIC_API_KEY` / AWS / GH tokens leak   |
+| `Content-Security-Policy`   | `default-src 'self'` · `frame-ancestors 'none'` · all scripts vendored          |
+| `mandatory DOMPurify`       | every `innerHTML` sanitised · text-only fallback when DP is missing             |
+| `canonical cwd guard`       | PTY spawn refuses paths outside `$HOME`                                         |
+| `host validation`           | loud `stderr` warning on `--host` outside loopback                              |
 
 A full third-party audit on the codebase produced **3 P0 / 33 P1 / 13 P2** findings —
 **all P0 and the vast majority of P1/P2 are fixed in `c9d5fbe`**.
