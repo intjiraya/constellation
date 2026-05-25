@@ -1,0 +1,61 @@
+name: aur publish
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to publish (e.g. v0.1.2)"
+        required: true
+
+permissions:
+  contents: read
+
+env:
+  AUR_PKGNAME: constellation-bin
+  AUR_MAINTAINER_NAME: Jiraya
+  AUR_MAINTAINER_EMAIL: "177346249+intjiraya@users.noreply.github.com"
+
+jobs:
+  publish:
+    name: publish to AUR
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: derive version
+        id: ver
+        env:
+          REF_NAME: ${{ github.event.release.tag_name || inputs.tag }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="$REF_NAME"
+          version="${tag#v}"
+          printf 'version=%s\n' "$version" >> "$GITHUB_OUTPUT"
+          printf 'commit_msg=upgpkg: constellation-bin %s-1\n' "$version" >> "$GITHUB_OUTPUT"
+
+      - name: bump pkgver / reset pkgrel in PKGBUILD
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          file=packaging/aur/constellation-bin/PKGBUILD
+          sed -i "s/^pkgver=.*/pkgver=$VERSION/" "$file"
+          sed -i "s/^pkgrel=.*/pkgrel=1/" "$file"
+          grep -E '^(pkgver|pkgrel)=' "$file"
+
+      - uses: KSXGitHub/github-actions-deploy-aur@v4.1.1
+        with:
+          pkgname: ${{ env.AUR_PKGNAME }}
+          pkgbuild: packaging/aur/constellation-bin/PKGBUILD
+          commit_username: ${{ env.AUR_MAINTAINER_NAME }}
+          commit_email: ${{ env.AUR_MAINTAINER_EMAIL }}
+          ssh_private_key: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
+          commit_message: ${{ steps.ver.outputs.commit_msg }}
+          ssh_keyscan_types: rsa,ecdsa,ed25519
+          updpkgsums: true
+          test: false
+          force_push: true
