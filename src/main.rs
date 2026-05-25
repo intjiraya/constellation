@@ -15,20 +15,19 @@ const ABOUT: &str = "A local web UI for browsing and resuming every Claude Code 
 #[derive(Debug, Parser)]
 #[command(name = "cchats", version, about = ABOUT, long_about = None)]
 struct Args {
-    
     #[arg(long, default_value = "127.0.0.1")]
     host: String,
 
-#[arg(long, default_value_t = 6767)]
+    #[arg(long, default_value_t = 6767)]
     port: u16,
 
-#[arg(long)]
+    #[arg(long)]
     no_open: bool,
 
-#[arg(long)]
+    #[arg(long)]
     root: Option<PathBuf>,
 
-#[arg(long, default_value = "warn,constellation=info")]
+    #[arg(long, default_value = "warn,constellation=info")]
     log: String,
 }
 
@@ -84,7 +83,7 @@ async fn serve(args: Args) -> Result<()> {
     let url = format!("http://{}", addr);
     eprintln!("constellation → {url}");
 
-let warmup_idx = index.clone();
+    let warmup_idx = index.clone();
     tokio::spawn(async move {
         warm_up(&warmup_idx).await;
         info!("initial index ready");

@@ -99,10 +99,12 @@ async fn bridge(
     info!("ws-pty bridge opening");
     let (mut ws_tx, mut ws_rx) = socket.split();
 
-let cwd_path = std::path::Path::new(&cwd);
+    let cwd_path = std::path::Path::new(&cwd);
     if !cwd_path.is_dir() {
         warn!(%cwd, "rejecting bridge: cwd missing");
-        let _ = ws_tx.send(error_frame(&format!("original cwd is missing: {cwd}"))).await;
+        let _ = ws_tx
+            .send(error_frame(&format!("original cwd is missing: {cwd}")))
+            .await;
         let _ = ws_tx.close().await;
         return;
     }
@@ -125,7 +127,9 @@ let cwd_path = std::path::Path::new(&cwd);
         Ok(p) => p,
         Err(e) => {
             warn!(error = %e, "openpty failed");
-            let _ = ws_tx.send(error_frame(&format!("openpty failed: {e}"))).await;
+            let _ = ws_tx
+                .send(error_frame(&format!("openpty failed: {e}")))
+                .await;
             let _ = ws_tx.close().await;
             return;
         }
@@ -146,7 +150,9 @@ let cwd_path = std::path::Path::new(&cwd);
         Ok(r) => r,
         Err(e) => {
             warn!(error = %e, "reader clone failed");
-            let _ = ws_tx.send(error_frame(&format!("reader clone failed: {e}"))).await;
+            let _ = ws_tx
+                .send(error_frame(&format!("reader clone failed: {e}")))
+                .await;
             let _ = child.kill();
             return;
         }
@@ -155,14 +161,16 @@ let cwd_path = std::path::Path::new(&cwd);
         Ok(w) => Arc::new(Mutex::new(w)),
         Err(e) => {
             warn!(error = %e, "writer take failed");
-            let _ = ws_tx.send(error_frame(&format!("writer take failed: {e}"))).await;
+            let _ = ws_tx
+                .send(error_frame(&format!("writer take failed: {e}")))
+                .await;
             let _ = child.kill();
             return;
         }
     };
     let master = Arc::new(Mutex::new(pair.master));
 
-let (out_tx, mut out_rx) = mpsc::channel::<PtyOutput>(CHANNEL_CAPACITY);
+    let (out_tx, mut out_rx) = mpsc::channel::<PtyOutput>(CHANNEL_CAPACITY);
     std::thread::spawn(move || {
         let mut reader = reader;
         let mut buf = vec![0u8; READ_BUF];
@@ -252,9 +260,8 @@ let (out_tx, mut out_rx) = mpsc::channel::<PtyOutput>(CHANNEL_CAPACITY);
         }
     }
 
-let _ = child.kill();
+    let _ = child.kill();
     let reap_result = tokio::task::spawn_blocking(move || {
-        
         let deadline = Instant::now() + CHILD_REAP_TIMEOUT;
         loop {
             if let Ok(Some(status)) = child.try_wait() {
@@ -269,7 +276,11 @@ let _ = child.kill();
     .await;
     match reap_result {
         Ok(Ok(status)) => {
-            info!(?status, elapsed_ms = started.elapsed().as_millis() as u64, "bridge closed");
+            info!(
+                ?status,
+                elapsed_ms = started.elapsed().as_millis() as u64,
+                "bridge closed"
+            );
         }
         Ok(Err(())) => {
             warn!(

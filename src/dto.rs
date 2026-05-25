@@ -43,7 +43,7 @@ impl From<&ProjectInfo> for ProjectOut {
 #[cfg(test)]
 mod tests {
 
-use super::*;
+    use super::*;
     use serde_json::json;
 
     #[test]

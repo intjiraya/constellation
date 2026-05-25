@@ -66,15 +66,14 @@ pub struct Usage {
 }
 
 impl Usage {
-    
     pub fn total_input(&self) -> u64 {
         self.input + self.cache_creation + self.cache_read
     }
-    
+
     pub fn total(&self) -> u64 {
         self.total_input() + self.output
     }
-    
+
     pub fn cache_hit_ratio(&self) -> Option<f32> {
         let total_in = self.total_input();
         if total_in == 0 {
@@ -107,7 +106,7 @@ pub struct SessionMeta {
     pub size: u64,
     pub usage: Usage,
 
-#[serde(default, skip_serializing_if = "is_zero_usize")]
+    #[serde(default, skip_serializing_if = "is_zero_usize")]
     pub skipped_lines: usize,
 }
 
@@ -203,7 +202,9 @@ enum RawBlock {
 }
 
 fn parse_timestamp(s: &str) -> Option<DateTime<Utc>> {
-    DateTime::parse_from_rfc3339(s).ok().map(|d| d.with_timezone(&Utc))
+    DateTime::parse_from_rfc3339(s)
+        .ok()
+        .map(|d| d.with_timezone(&Utc))
 }
 
 fn real_user_text(content: &Value) -> String {
@@ -227,7 +228,12 @@ fn is_noise(text: &str) -> bool {
 }
 
 fn clean_title(text: &str) -> String {
-    text.split_whitespace().collect::<Vec<_>>().join(" ").chars().take(120).collect()
+    text.split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+        .chars()
+        .take(120)
+        .collect()
 }
 
 fn extract_blocks(content: Value) -> Vec<Block> {
@@ -398,7 +404,11 @@ fn aggregate(path: &Path, mode: Mode) -> Aggregated {
             continue;
         }
 
-        let role = if kind == "user" { Role::User } else { Role::Assistant };
+        let role = if kind == "user" {
+            Role::User
+        } else {
+            Role::Assistant
+        };
         let ts = raw.timestamp.as_deref().and_then(parse_timestamp);
 
         if let Some(t) = ts {
@@ -536,7 +546,10 @@ pub fn parse_session_meta(path: &Path) -> SessionMeta {
 pub fn parse_session(path: &Path) -> Session {
     let agg = aggregate(path, Mode::Full);
     let meta = build_meta(path, &agg);
-    Session { meta, turns: agg.turns }
+    Session {
+        meta,
+        turns: agg.turns,
+    }
 }
 
 #[cfg(test)]
@@ -552,7 +565,7 @@ mod tests {
         fixtures().join(name)
     }
 
-#[test]
+    #[test]
     fn meta_minimal() {
         let m = parse_session_meta(&fp("minimal.jsonl"));
         assert_eq!(m.id, "minimal-uuid");
@@ -604,7 +617,7 @@ mod tests {
         assert_eq!(m.title, "Survives broken lines");
         assert_eq!(m.message_count, 2);
         assert_eq!(m.cwd, "/x");
-        
+
         assert_eq!(m.skipped_lines, 2);
     }
 
@@ -623,7 +636,7 @@ mod tests {
         assert!(m.size > 0);
     }
 
-#[test]
+    #[test]
     fn full_parse_minimal() {
         let s = parse_session(&fp("minimal.jsonl"));
         assert_eq!(s.meta.id, "minimal-uuid");
@@ -650,9 +663,11 @@ mod tests {
             .iter()
             .flat_map(|t| &t.blocks)
             .find_map(|b| match b {
-                Block::ToolUse { tool_name, tool_input, .. } => {
-                    Some((tool_name.clone(), tool_input.clone()))
-                }
+                Block::ToolUse {
+                    tool_name,
+                    tool_input,
+                    ..
+                } => Some((tool_name.clone(), tool_input.clone())),
                 _ => None,
             })
             .expect("tool_use block");
@@ -719,7 +734,7 @@ mod tests {
         assert_eq!(s.meta.title, "(empty session)");
     }
 
-#[test]
+    #[test]
     fn usage_is_aggregated_across_assistant_turns() {
         let m = parse_session_meta(&fp("with_usage.jsonl"));
         assert_eq!(m.usage.input, 15);
@@ -745,7 +760,7 @@ mod tests {
         assert_eq!(m.usage.cache_hit_ratio(), None);
     }
 
-#[test]
+    #[test]
     fn title_skips_slash_command_messages() {
         let m = parse_session_meta(&fp("command_first.jsonl"));
         assert!(!m.title.contains("command-name"));
@@ -759,9 +774,8 @@ mod tests {
         assert!(!m.title.contains("  "));
     }
 
-#[test]
+    #[test]
     fn meta_only_mode_matches_full_mode_for_counts() {
-        
         let full = parse_session(&fp("with_tools.jsonl"));
         let meta = parse_session_meta(&fp("with_tools.jsonl"));
         assert_eq!(meta.tool_count, full.meta.tool_count);
@@ -769,7 +783,7 @@ mod tests {
         assert_eq!(meta.usage, full.meta.usage);
     }
 
-#[test]
+    #[test]
     fn is_noise_empty_string_is_not_noise() {
         assert!(!is_noise(""));
     }
@@ -781,10 +795,12 @@ mod tests {
 
     #[test]
     fn is_noise_mid_string_is_not_noise() {
-        assert!(!is_noise("real text containing <command-name> mid sentence"));
+        assert!(!is_noise(
+            "real text containing <command-name> mid sentence"
+        ));
     }
 
-#[test]
+    #[test]
     fn block_serializes_with_kind_discriminator() {
         let b = Block::Text { text: "hi".into() };
         let json = serde_json::to_value(&b).unwrap();

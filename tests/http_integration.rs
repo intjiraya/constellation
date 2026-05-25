@@ -1,12 +1,12 @@
 use std::path::{Path, PathBuf};
 
-use axum::body::{to_bytes, Body};
-use axum::http::{header, Method, Request, StatusCode};
+use axum::body::{Body, to_bytes};
+use axum::http::{Method, Request, StatusCode, header};
 use serde_json::Value;
 use tempfile::TempDir;
 use tower::ServiceExt;
 
-use constellation::http::{build_router, AppState};
+use constellation::http::{AppState, build_router};
 use constellation::index::Index;
 
 fn fixtures() -> PathBuf {
@@ -24,9 +24,21 @@ fn seed(project_dir: &Path, fixture: &str, session_name: &str) {
 
 fn ready_router() -> (axum::Router, TempDir) {
     let tmp = TempDir::new().unwrap();
-    seed(&tmp.path().join("-home-test-x"), "minimal.jsonl", "minimal-uuid");
-    seed(&tmp.path().join("-home-test-y"), "with_tools.jsonl", "tools-uuid");
-    seed(&tmp.path().join("-home-test-x"), "with_usage.jsonl", "usage-uuid");
+    seed(
+        &tmp.path().join("-home-test-x"),
+        "minimal.jsonl",
+        "minimal-uuid",
+    );
+    seed(
+        &tmp.path().join("-home-test-y"),
+        "with_tools.jsonl",
+        "tools-uuid",
+    );
+    seed(
+        &tmp.path().join("-home-test-x"),
+        "with_usage.jsonl",
+        "usage-uuid",
+    );
 
     let index = Index::new(tmp.path().to_owned());
     index.rebuild();
@@ -65,11 +77,14 @@ async fn get_stats_returns_populated_index_shape() {
     assert_eq!(v["projects"], 2);
     assert_eq!(v["sessions"], 3);
     assert_eq!(v["scanning"], false);
-    
+
     for key in ["input", "cache_creation", "cache_read", "output"] {
-        assert!(v["total_usage"].get(key).is_some(), "missing total_usage.{key}");
+        assert!(
+            v["total_usage"].get(key).is_some(),
+            "missing total_usage.{key}"
+        );
     }
-    
+
     assert_eq!(v["total_usage"]["input"], 15);
     assert_eq!(v["total_usage"]["output"], 300);
 }
@@ -94,8 +109,14 @@ async fn list_projects_returns_correct_shape() {
     assert_eq!(arr.len(), 2);
     for project in arr {
         for key in [
-            "sanitized_name", "cwd", "display_path", "session_count",
-            "total_messages", "total_tools", "total_usage", "latest_at",
+            "sanitized_name",
+            "cwd",
+            "display_path",
+            "session_count",
+            "total_messages",
+            "total_tools",
+            "total_usage",
+            "latest_at",
         ] {
             assert!(project.get(key).is_some(), "missing project.{key}");
         }
@@ -123,7 +144,7 @@ async fn list_project_sessions_200_for_known_name() {
     let v = body_to_json(resp.into_body()).await;
     let arr = v.as_array().unwrap();
     assert_eq!(arr.len(), 2);
-    
+
     let first_id = arr[0]["id"].as_str().unwrap();
     assert!(first_id == "minimal-uuid" || first_id == "usage-uuid");
 }
@@ -147,7 +168,7 @@ async fn get_session_200_returns_typed_blocks() {
         .unwrap();
     assert_eq!(resp.status(), StatusCode::OK);
     let v = body_to_json(resp.into_body()).await;
-    
+
     assert_eq!(v["id"], "minimal-uuid");
     assert!(v["turns"].is_array());
     let first_turn = &v["turns"][0];
@@ -247,7 +268,10 @@ async fn root_serves_index_html() {
 #[tokio::test]
 async fn static_unknown_path_404() {
     let (app, _tmp) = ready_router();
-    let resp = app.oneshot(req_get("/static/nonexistent.js")).await.unwrap();
+    let resp = app
+        .oneshot(req_get("/static/nonexistent.js"))
+        .await
+        .unwrap();
     assert_eq!(resp.status(), StatusCode::NOT_FOUND);
 }
 

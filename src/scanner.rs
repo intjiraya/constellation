@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 use chrono::{DateTime, Utc};
 use serde::Serialize;
 
-use crate::parser::{parse_session_meta, SessionMeta, Usage};
+use crate::parser::{SessionMeta, Usage, parse_session_meta};
 
 #[derive(Debug, Clone, Serialize)]
 pub struct ProjectInfo {
@@ -33,9 +33,11 @@ impl ProjectInfo {
         self.sessions.iter().filter_map(|s| s.last_at).max()
     }
 
-pub fn display_path(&self) -> String {
+    pub fn display_path(&self) -> String {
+        let normalised = self.cwd.replace('\\', "/");
         if let Some(home) = dirs::home_dir().and_then(|p| p.to_str().map(str::to_owned)) {
-            if let Some(rest) = self.cwd.strip_prefix(&home) {
+            let home = home.replace('\\', "/");
+            if let Some(rest) = normalised.strip_prefix(&home) {
                 return if rest.is_empty() {
                     "~".to_owned()
                 } else {
@@ -43,7 +45,7 @@ pub fn display_path(&self) -> String {
                 };
             }
         }
-        self.cwd.clone()
+        normalised
     }
 }
 
@@ -102,7 +104,11 @@ pub fn scan_projects(root: &Path) -> Vec<ProjectInfo> {
                 .iter()
                 .find_map(|s| (!s.cwd.is_empty()).then(|| s.cwd.clone()))
                 .unwrap_or_else(|| resolve_cwd_naive(&sanitized));
-            ProjectInfo { sanitized_name: sanitized, cwd, sessions }
+            ProjectInfo {
+                sanitized_name: sanitized,
+                cwd,
+                sessions,
+            }
         })
         .collect();
 
@@ -136,7 +142,11 @@ mod tests {
     #[test]
     fn finds_one_project() {
         let tmp = TempDir::new().unwrap();
-        seed(&tmp.path().join("-home-test-proj"), "minimal.jsonl", "minimal-uuid");
+        seed(
+            &tmp.path().join("-home-test-proj"),
+            "minimal.jsonl",
+            "minimal-uuid",
+        );
         let out = scan_projects(tmp.path());
         assert_eq!(out.len(), 1);
         assert_eq!(out[0].sanitized_name, "-home-test-proj");
@@ -147,9 +157,13 @@ mod tests {
     #[test]
     fn resolves_cwd_from_session_record() {
         let tmp = TempDir::new().unwrap();
-        seed(&tmp.path().join("-some-weird-thing"), "minimal.jsonl", "minimal-uuid");
+        seed(
+            &tmp.path().join("-some-weird-thing"),
+            "minimal.jsonl",
+            "minimal-uuid",
+        );
         let out = scan_projects(tmp.path());
-        
+
         assert_eq!(out[0].cwd, "/home/test/proj");
     }
 
@@ -167,8 +181,8 @@ mod tests {
     #[test]
     fn sorts_projects_by_latest_session_activity() {
         let tmp = TempDir::new().unwrap();
-        seed(&tmp.path().join("-old"), "minimal.jsonl", "a"); 
-        seed(&tmp.path().join("-new"), "no_title.jsonl", "b"); 
+        seed(&tmp.path().join("-old"), "minimal.jsonl", "a");
+        seed(&tmp.path().join("-new"), "no_title.jsonl", "b");
         let out = scan_projects(tmp.path());
         let names: Vec<&str> = out.iter().map(|p| p.sanitized_name.as_str()).collect();
         assert_eq!(names, vec!["-new", "-old"]);
@@ -202,8 +216,8 @@ mod tests {
     fn list_sessions_in_dir_sorts_by_latest() {
         let tmp = TempDir::new().unwrap();
         let p = tmp.path().join("-x");
-        seed(&p, "minimal.jsonl", "early");   
-        seed(&p, "no_title.jsonl", "later");  
+        seed(&p, "minimal.jsonl", "early");
+        seed(&p, "no_title.jsonl", "later");
         let sessions = list_sessions_in_dir(&p);
         assert_eq!(sessions[0].id, "notitle-uuid");
         assert_eq!(sessions[1].id, "minimal-uuid");
@@ -211,7 +225,10 @@ mod tests {
 
     #[test]
     fn resolve_cwd_naive_known_cases() {
-        assert_eq!(resolve_cwd_naive("-home-jiraya-code-personal"), "/home/jiraya/code/personal");
+        assert_eq!(
+            resolve_cwd_naive("-home-jiraya-code-personal"),
+            "/home/jiraya/code/personal"
+        );
         assert_eq!(resolve_cwd_naive("-srv-app"), "/srv/app");
         assert_eq!(resolve_cwd_naive("-home-foo-bar-baz"), "/home/foo/bar/baz");
     }
@@ -223,8 +240,8 @@ mod tests {
         seed(&p, "minimal.jsonl", "a");
         seed(&p, "with_tools.jsonl", "b");
         let out = scan_projects(tmp.path());
-        assert_eq!(out[0].total_messages(), 8); 
-        assert_eq!(out[0].total_tools(), 1); 
+        assert_eq!(out[0].total_messages(), 8);
+        assert_eq!(out[0].total_tools(), 1);
     }
 
     #[test]

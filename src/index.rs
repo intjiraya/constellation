@@ -64,7 +64,7 @@ pub struct Index {
     state: Arc<RwLock<Snapshot>>,
     scanning: Arc<Mutex<bool>>,
 
-rebuild_lock: Arc<Mutex<()>>,
+    rebuild_lock: Arc<Mutex<()>>,
 }
 
 impl Index {
@@ -89,7 +89,7 @@ impl Index {
         *self.scanning.lock()
     }
 
-pub fn rebuild(&self) {
+    pub fn rebuild(&self) {
         let _serialise = self.rebuild_lock.lock();
         let _flag = ScanFlag::set(&self.scanning);
 
@@ -111,12 +111,12 @@ pub fn rebuild(&self) {
         *self.state.write() = new_snap;
     }
 
-pub async fn rebuild_async(&self) -> Result<(), tokio::task::JoinError> {
+    pub async fn rebuild_async(&self) -> Result<(), tokio::task::JoinError> {
         let me = self.clone();
         tokio::task::spawn_blocking(move || me.rebuild()).await
     }
 
-pub fn read(&self) -> SnapshotGuard<'_> {
+    pub fn read(&self) -> SnapshotGuard<'_> {
         SnapshotGuard {
             inner: self.state.read(),
         }
@@ -202,7 +202,7 @@ mod tests {
         seed(&tmp.path().join("-a"), "minimal.jsonl", "minimal-uuid");
         let idx = Index::new(tmp.path().to_owned());
 
-let i1 = idx.clone();
+        let i1 = idx.clone();
         let i2 = idx.clone();
         let t1 = std::thread::spawn(move || i1.rebuild());
         let t2 = std::thread::spawn(move || i2.rebuild());

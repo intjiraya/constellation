@@ -75,12 +75,8 @@ pub struct ResumeQuery {
 }
 
 pub fn build_router(state: AppState) -> Router {
-
-let ws_routes = Router::new()
-        .route(
-            "/api/projects/{sanitized_name}/new-chat",
-            get(ws_new_chat),
-        )
+    let ws_routes = Router::new()
+        .route("/api/projects/{sanitized_name}/new-chat", get(ws_new_chat))
         .route("/api/sessions/{session_id}/pty", get(ws_resume))
         .layer(middleware::from_fn(reject_non_loopback_origin));
 
@@ -107,7 +103,7 @@ async fn add_security_headers(req: axum::extract::Request, next: Next) -> Respon
     let mut resp = next.run(req).await;
     let h = resp.headers_mut();
 
-h.insert(
+    h.insert(
         header::CONTENT_SECURITY_POLICY,
         HeaderValue::from_static(
             "default-src 'self'; \
@@ -121,10 +117,7 @@ h.insert(
              base-uri 'self'",
         ),
     );
-    h.insert(
-        header::X_FRAME_OPTIONS,
-        HeaderValue::from_static("DENY"),
-    );
+    h.insert(header::X_FRAME_OPTIONS, HeaderValue::from_static("DENY"));
     h.insert(
         header::X_CONTENT_TYPE_OPTIONS,
         HeaderValue::from_static("nosniff"),
@@ -169,26 +162,25 @@ fn parse_origin(s: &str) -> Option<ParsedOrigin<'_>> {
     let (scheme, rest) = s.split_once("://")?;
     let authority = rest.split_once('/').map(|(a, _)| a).unwrap_or(rest);
     if authority.starts_with('[') {
-        
         let end = authority.find(']')?;
         return Some(ParsedOrigin {
             scheme,
             host: &authority[..=end],
         });
     }
-    let host = authority.rsplit_once(':').map(|(h, _)| h).unwrap_or(authority);
+    let host = authority
+        .rsplit_once(':')
+        .map(|(h, _)| h)
+        .unwrap_or(authority);
     Some(ParsedOrigin { scheme, host })
 }
 
 fn build_index_stats(state: &AppState) -> IndexStats {
     let snap = state.index.read();
-    let total_usage = snap
-        .projects
-        .iter()
-        .fold(Usage::default(), |mut acc, p| {
-            acc.add(&p.total_usage());
-            acc
-        });
+    let total_usage = snap.projects.iter().fold(Usage::default(), |mut acc, p| {
+        acc.add(&p.total_usage());
+        acc
+    });
     IndexStats {
         projects: snap.project_count(),
         sessions: snap.session_count(),
@@ -211,7 +203,7 @@ async fn post_reindex(State(s): State<AppState>) -> Result<Json<IndexStats>, Sta
             error!(error = %e, "reindex panicked");
             StatusCode::INTERNAL_SERVER_ERROR
         })?;
-    
+
     s.cache.clear();
     Ok(Json(build_index_stats(&s)))
 }
@@ -241,7 +233,7 @@ async fn get_session(
     };
     let meta = meta.ok_or(StatusCode::NOT_FOUND)?;
 
-let file_size = match std::fs::metadata(&meta.path) {
+    let file_size = match std::fs::metadata(&meta.path) {
         Ok(m) => m.len(),
         Err(_) => return Err(StatusCode::NOT_FOUND),
     };
@@ -263,11 +255,7 @@ let file_size = match std::fs::metadata(&meta.path) {
         s.cache.insert(session_id, file_size, bytes.clone());
         bytes
     };
-    Ok((
-        [(header::CONTENT_TYPE, "application/json")],
-        json,
-    )
-        .into_response())
+    Ok(([(header::CONTENT_TYPE, "application/json")], json).into_response())
 }
 
 async fn ws_resume(
@@ -371,7 +359,6 @@ mod tests {
 
     #[test]
     fn origin_check_rejects_null_origin() {
-        
         assert!(!origin_is_loopback(&hdrs("null")));
     }
 }

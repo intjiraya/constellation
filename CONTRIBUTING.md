@@ -32,16 +32,16 @@ declared in `Cargo.toml`. The CI matrix verifies MSRV builds on every PR.
 Commits and PR titles use [Conventional Commits](https://www.conventionalcommits.org).
 `release-plz` reads them to bump versions and assemble `CHANGELOG.md`.
 
-| prefix      | when to use                                  |
-| :---------- | :------------------------------------------- |
-| `feat:`     | a new user-facing capability                 |
-| `fix:`      | a bug fix                                    |
+| prefix      | when to use                                    |
+| :---------- | :--------------------------------------------- |
+| `feat:`     | a new user-facing capability                   |
+| `fix:`      | a bug fix                                      |
 | `perf:`     | a performance improvement, no behaviour change |
-| `refactor:` | a code change with no behaviour change       |
-| `docs:`     | docs-only change                             |
-| `chore:`    | non-code change (deps, repo hygiene)         |
-| `ci:`       | CI/CD only                                   |
-| `test:`     | test-only changes                            |
+| `refactor:` | a code change with no behaviour change         |
+| `docs:`     | docs-only change                               |
+| `chore:`    | non-code change (deps, repo hygiene)           |
+| `ci:`       | CI/CD only                                     |
+| `test:`     | test-only changes                              |
 
 Breaking changes: append `!` (e.g. `feat!: drop --legacy-flag`) and add a
 `BREAKING CHANGE:` footer in the body.
