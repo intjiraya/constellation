@@ -6,31 +6,26 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
-# Changelog
 
-All notable changes to this project will be documented in this file.
+## [0.1.3] - 2026-05-25
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+No user-facing changes. Release / CI pipeline maintenance only.
 
-# Changelog
+## [0.1.2] - 2026-05-25
 
-All notable changes to this project will be documented in this file.
+No user-facing changes. Release / CI pipeline maintenance only.
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
-
-
-## [0.1.1](https://github.com/intjiraya/constellation/compare/v0.1.0...v0.1.1) - 2026-05-25
+## [0.1.1] - 2026-05-25
 
 ### Documentation
-- redesign README - by @intjiraya
-- fix README table alignment - by @intjiraya
-- trim README - by @intjiraya
-- tweak README ascii art - by @intjiraya
+
+- Redesign README, fix table alignment, trim, tweak ASCII art.
 
 ### Fixed
-- windows path separator in display_path + add CoC 3.0 + apply cargo fmt - by @intjiraya
+
+- Windows path separator handling in `display_path`.
+- Add Contributor Covenant 3.0 Code of Conduct.
+- Apply `cargo fmt` repo-wide.
 
 ## [0.1.0] - 2026-05-25
 
@@ -48,14 +43,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
-- WebSocket `Origin` enforced loopback-only (rejects same-machine cross-origin
-  attaches).
-- Child environment restricted to a 28-key allowlist (`TERM`, `PATH`, `HOME`,
-  ...). No ambient credentials forwarded to spawned `claude`.
-- Strict `Content-Security-Policy`: `default-src 'self'`, `frame-ancestors
-  'none'`, all third-party scripts vendored inside the binary.
+- WebSocket `Origin` enforced loopback-only (rejects same-machine
+  cross-origin attaches).
+- Child environment restricted to a 28-key allowlist (`TERM`, `PATH`,
+  `HOME`, ...). No ambient credentials forwarded to spawned `claude`.
+- Strict `Content-Security-Policy`: `default-src 'self'`,
+  `frame-ancestors 'none'`, all third-party scripts vendored inside
+  the binary.
 - DOMPurify mandatory, with a text-only fallback if it fails to load.
 - Spawned cwd must canonicalise under `$HOME`.
 
-[Unreleased]: https://github.com/intjiraya/constellation/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/intjiraya/constellation/compare/v0.1.3...HEAD
+[0.1.3]: https://github.com/intjiraya/constellation/releases/tag/v0.1.3
+[0.1.2]: https://github.com/intjiraya/constellation/releases/tag/v0.1.2
+[0.1.1]: https://github.com/intjiraya/constellation/releases/tag/v0.1.1
 [0.1.0]: https://github.com/intjiraya/constellation/releases/tag/v0.1.0
