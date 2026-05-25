@@ -3,12 +3,11 @@
 <br>
 
 ```
-                       _       _ _       _   _
+                     _       _ _       _   _
   ___ ___  _ __  ___| |_ ___| | | __ _| |_(_) ___  _ __
  / __/ _ \| '_ \/ __| __/ _ \ | |/ _` | __| |/ _ \| '_ \
 | (_| (_) | | | \__ \ ||  __/ | | (_| | |_| | (_) | | | |
  \___\___/|_| |_|___/\__\___|_|_|\__,_|\__|_|\___/|_| |_|
-
 ```
 
 #### every claude code chat, in one place - fast, local, single binary
@@ -20,29 +19,6 @@
 > `claude --resume` only shows chats from the directory you're in.
 > **constellation** reads every chat from every project, in one place,
 > with a real PTY-resume right in the browser.
-
-<br>
-
-<div align="center">
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│  ●  constellation       ●  352 indexed - 3.4M tok    ⌕ search   │
-│ ─────────────────────────────────────────────────────────────── │
-│                │                          │                     │
-│  PROJECTS   29 │  ~/code/personal  -  8   │  refactor auth      │
-│  ────────────  │  ──────────────────────  │  ─────────────      │
-│  ▸ ~/code/…12  │  ▸ refactor auth         │  user - 14:48       │
-│  ▸ ~/srv  - 8  │    351 msgs - 2h - opus  │  pulled out…        │
-│  ▸ ~/…/y  -17  │  ▸ migrate to prisma     │                     │
-│  ▸ ~/…/i  -23  │     89 msgs - 5h - opus  │  asst - 14:48       │
-│                │  ▸ tokens audit          │  here's a plan…     │
-│                │     42 msgs - just now   │                     │
-│                │                          │  ▶ resume   ⑂ fork  │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-</div>
 
 <br>
 
@@ -103,15 +79,15 @@ cchats --root /custom/path    # override ~/.claude/projects
 
 ## blazing fast
 
-| metric              |       value |
-| :------------------ | ----------: |
-| cold start          |      5.6 ms |
-| index ready (152)   |      447 ms |
+| metric              |        value |
+| :------------------ | -----------: |
+| cold start          |       5.6 ms |
+| index ready (152)   |       447 ms |
 | RSS idle            |     18.6 MiB |
-| `/api/stats` p50    |     0.08 ms |
-| `/api/projects` p50 |     0.14 ms |
-| big session parse   |       27 ms |
-| reindex 234 MiB     |      430 ms |
+| `/api/stats` p50    |      0.08 ms |
+| `/api/projects` p50 |      0.14 ms |
+| big session parse   |        27 ms |
+| reindex 234 MiB     |       430 ms |
 
 Single binary, no runtime, no warmup. It just starts.
 
