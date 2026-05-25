@@ -45,7 +45,7 @@ jobs:
             archive: tar.xz
             exe: ""
           - target: x86_64-apple-darwin
-            runner: macos-13
+            runner: macos-latest
             use_cross: false
             archive: tar.xz
             exe: ""
