@@ -5,6 +5,7 @@ git_release_enable = false
 publish = false
 semver_check = true
 dependencies_update = false
+release_always = false
 
 [changelog]
 header = """\
