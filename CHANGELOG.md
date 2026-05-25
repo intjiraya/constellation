@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.2](https://github.com/intjiraya/constellation/compare/v0.1.1...v0.1.2) - 2026-05-25
+
+### Documentation
+- redesign README - by @intjiraya
+- fix README table alignment - by @intjiraya
+- trim README - by @intjiraya
+- tweak README ascii art - by @intjiraya
+
+### Fixed
+- windows path separator in display_path + add CoC 3.0 + apply cargo fmt - by @intjiraya
+
 ## [0.1.1](https://github.com/intjiraya/constellation/compare/v0.1.0...v0.1.1) - 2026-05-25
 
 ### Documentation
